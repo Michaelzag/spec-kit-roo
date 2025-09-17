@@ -16,13 +16,19 @@
 
 - [🤔 What is Spec-Driven Development?](#-what-is-spec-driven-development)
 - [⚡ Get started](#-get-started)
+- [📽️ Video Overview](#️-video-overview)
+- [🔧 Specify CLI Reference](#-specify-cli-reference)
 - [📚 Core philosophy](#-core-philosophy)
 - [🌟 Development phases](#-development-phases)
 - [🎯 Roo Code integration](#-roo-code-integration)
 - [🔧 Prerequisites](#-prerequisites)
 - [📖 Learn more](#-learn-more)
-- [Detailed process](#detailed-process)
-- [Troubleshooting](#troubleshooting)
+- [📋 Detailed process](#-detailed-process)
+- [🔍 Troubleshooting](#-troubleshooting)
+- [👥 Maintainers](#-maintainers)
+- [💬 Support](#-support)
+- [🙏 Acknowledgements](#-acknowledgements)
+- [📄 License](#-license)
 
 ## 🤔 What is Spec-Driven Development?
 
@@ -55,7 +61,7 @@ uvx --from git+https://github.com/Michaelzag/spec-kit-roo.git specify init --her
 Use Roo Code's **Spec Writer** mode or the `/specify` command to describe what you want to build. Focus on the **what** and **why**, not the tech stack.
 
 ```bash
-/specify Build an application that can help me organize my photos in separate photo albums. Albums are grouped by date and can be re-organized by dragging and dropping on the main page. Albums never other nested albums. Within each album, photos are previewed in a tile-like interface.
+/specify Build an application that can help me organize my photos in separate photo albums. Albums are grouped by date and can be re-organized by dragging and dropping on the main page. Albums are never in other nested albums. Within each album, photos are previewed in a tile-like interface.
 ```
 
 ### 3. Create a technical implementation plan
@@ -71,6 +77,64 @@ Use Roo Code's **Plan Architect** mode or the `/plan` command to provide your te
 Use Roo Code's **Task Orchestrator** mode or `/tasks` to create an actionable task list, then implement features systematically.
 
 For detailed step-by-step instructions, see our [comprehensive guide](./spec-driven.md).
+
+## 📽️ Video Overview
+
+Want to see Spec Kit in action? Watch our [video overview](https://www.youtube.com/watch?v=a9eR1xsfvHg&pp=0gcJCckJAYcqIYzv)!
+
+[![Spec Kit video header](/media/spec-kit-video-header.jpg)](https://www.youtube.com/watch?v=a9eR1xsfvHg&pp=0gcJCckJAYcqIYzv)
+
+## 🔧 Specify CLI Reference
+
+The `specify` command supports the following options:
+
+### Commands
+
+| Command     | Description                                                    |
+|-------------|----------------------------------------------------------------|
+| `init`      | Initialize a new Specify project from the latest template      |
+| `check`     | Check for installed tools (`git`, `claude`, `gemini`, `code`/`code-insiders`, `cursor-agent`) |
+
+### `specify init` Arguments & Options
+
+| Argument/Option        | Type     | Description                                                                  |
+|------------------------|----------|------------------------------------------------------------------------------|
+| `<project-name>`       | Argument | Name for your new project directory (optional if using `--here`)            |
+| `--ai`                 | Option   | AI assistant to use: `claude`, `gemini`, `copilot`, or `cursor`             |
+| `--script`             | Option   | Script variant to use: `sh` (bash/zsh) or `ps` (PowerShell)                 |
+| `--ignore-agent-tools` | Flag     | Skip checks for AI agent tools like Claude Code                             |
+| `--no-git`             | Flag     | Skip git repository initialization                                          |
+| `--here`               | Flag     | Initialize project in the current directory instead of creating a new one   |
+| `--skip-tls`           | Flag     | Skip SSL/TLS verification (not recommended)                                 |
+| `--debug`              | Flag     | Enable detailed debug output for troubleshooting                            |
+
+### Examples
+
+```bash
+# Basic project initialization
+specify init my-project
+
+# Initialize with specific AI assistant
+specify init my-project --ai claude
+
+# Initialize with Cursor support
+specify init my-project --ai cursor
+
+# Initialize with PowerShell scripts (Windows/cross-platform)
+specify init my-project --ai copilot --script ps
+
+# Initialize in current directory
+specify init --here --ai copilot
+
+# Skip git initialization
+specify init my-project --ai gemini --no-git
+
+# Enable debug output for troubleshooting
+specify init my-project --ai claude --debug
+
+# Check system requirements
+specify check
+```
 
 ## 📚 Core philosophy
 
@@ -122,11 +186,20 @@ Spec-Driven Development with Roo Code integration is a structured process that e
 - **Constitutional Awareness**: Built-in compliance with project principles
 - **Mode Orchestration**: Automatic coordination between development phases
 - **Progressive Refinement**: Iterative enhancement based on user feedback
+- **User-Centric Delivery**: Build applications for different user cohorts and preferences
+- **Flexible Development Approaches**: Support workflows from vibe-coding to AI-native development
+
+### Creative & iterative processes
+
+- Validate the concept of parallel implementation exploration
+- Provide robust iterative feature development workflows
+- Extend processes to handle upgrades and modernization tasks
 
 ## 🔧 Prerequisites
 
 - **Linux/macOS** (or WSL2 on Windows)
-- [Roo Code extension](https://github.com/roocode/roocode) for VS Code
+- [Roo Code extension](https://github.com/roocode/roocode) for VS Code (primary agent)
+- Optional AI coding agents: [Claude Code](https://www.anthropic.com/claude-code), [GitHub Copilot](https://code.visualstudio.com/), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or [Cursor](https://cursor.sh/)
 - [uv](https://docs.astral.sh/uv/) for package management
 - [Python 3.11+](https://www.python.org/downloads/)
 - [Git](https://git-scm.com/downloads)
@@ -140,12 +213,12 @@ Spec-Driven Development with Roo Code integration is a structured process that e
 ## 📖 Learn more
 
 - **[Complete Spec-Driven Development Methodology](./spec-driven.md)** - Deep dive into the full process
-- **[Detailed Walkthrough](#detailed-process)** - Step-by-step implementation guide
+- **[Detailed Walkthrough](#-detailed-process)** - Step-by-step implementation guide
 - **[Roo Code Modes Reference](./templates/roo/modes.yml)** - Complete mode definitions and capabilities
 
 ---
 
-## Detailed process
+## 📋 Detailed process
 
 <details>
 <summary>Click to expand the detailed step-by-step walkthrough</summary>
@@ -232,8 +305,10 @@ At this stage, your project folder contents should resemble the following:
 │	 └── 001-create-taskify
 │	     └── spec.md
 ├── templates
-│	 ├── roo/
-│	 └── tasks-template.md
+│	 ├── plan-template.md
+│	 ├── spec-template.md
+│	 ├── tasks-template.md
+│	 └── roo/
 ├── .roo
 │	 ├── commands/
 │	 └── rules-*/
@@ -363,7 +438,7 @@ Once the implementation step is done, ask Roo Code to try to run the application
 
 ---
 
-## Troubleshooting
+## 🔍 Troubleshooting
 
 ### Git Credential Manager on Linux
 
@@ -382,19 +457,19 @@ echo "Cleaning up..."
 rm gcm-linux_amd64.2.6.1.deb
 ```
 
-## Maintainers
+## 👥 Maintainers
 
 - Michael Zag ([@Michaelzag](https://github.com/Michaelzag))
 - Original Spec-Kit Contributors
 
-## Support
+## 💬 Support
 
 For support, please open a [GitHub issue](https://github.com/Michaelzag/spec-kit-roo/issues/new). We welcome bug reports, feature requests, and questions about using Spec-Driven Development with Roo Code.
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 This project builds upon the original **Spec-Kit** project from GitHub and is inspired by the work of **John Lam**. Enhanced with **Roo Code** integration developed by **Michael Zag**.
 
-## License
+## 📄 License
 
 This project is licensed under the terms of the MIT open source license. Please refer to the [LICENSE](./LICENSE) file for the full terms.

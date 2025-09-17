@@ -446,12 +446,37 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
         console.print(Panel(str(e), title="Fetch Error", border_style="red"))
         raise typer.Exit(1)
     
-    # Find the template asset for the specified AI assistant
-    pattern = f"spec-kit-template-{ai_assistant}-{script_type}"
+    # Find the template asset for the specified AI assistant (with fallbacks)
+    asset_alias_map = {
+        "roo": "claude",  # Roo reuses Claude template assets until dedicated packages are published
+    }
+
+    lookup_ai = ai_assistant
+    pattern = f"spec-kit-template-{lookup_ai}-{script_type}"
     matching_assets = [
         asset for asset in release_data.get("assets", [])
         if pattern in asset["name"] and asset["name"].endswith(".zip")
     ]
+
+    fallback_used = False
+    if not matching_assets and ai_assistant in asset_alias_map:
+        fallback_ai = asset_alias_map[ai_assistant]
+        fallback_pattern = f"spec-kit-template-{fallback_ai}-{script_type}"
+        matching_assets = [
+            asset for asset in release_data.get("assets", [])
+            if fallback_pattern in asset["name"] and asset["name"].endswith(".zip")
+        ]
+        if matching_assets:
+            fallback_used = True
+            lookup_ai = fallback_ai
+            pattern = fallback_pattern
+            console.print(
+                Panel(
+                    f"No dedicated release asset found for '{ai_assistant}'. Using '{fallback_ai}' template instead.",
+                    title="Using Fallback Template",
+                    border_style="yellow",
+                )
+            )
 
     if not matching_assets:
         console.print(f"[red]No matching release asset found[/red] for pattern: [bold]{pattern}[/bold]")
@@ -515,7 +540,9 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
         "filename": filename,
         "size": file_size,
         "release": release_data["tag_name"],
-        "asset_url": download_url
+        "asset_url": download_url,
+        "effective_ai": lookup_ai,
+        "fallback_used": fallback_used,
     }
     return zip_path, metadata
 

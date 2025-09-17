@@ -420,72 +420,132 @@ def init_git_repo(project_path: Path, quiet: bool = False) -> bool:
 
 
 def download_template_from_github(ai_assistant: str, download_dir: Path, *, script_type: str = "sh", verbose: bool = True, show_progress: bool = True, client: httpx.Client = None, debug: bool = False) -> Tuple[Path, dict]:
-    repo_owner = "github"
-    repo_name = "spec-kit"
     if client is None:
         client = httpx.Client(verify=ssl_context)
-    
-    if verbose:
-        console.print("[cyan]Fetching latest release information...[/cyan]")
-    api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
-    
-    try:
-        response = client.get(api_url, timeout=30, follow_redirects=True)
-        status = response.status_code
-        if status != 200:
-            msg = f"GitHub API returned {status} for {api_url}"
-            if debug:
-                msg += f"\nResponse headers: {response.headers}\nBody (truncated 500): {response.text[:500]}"
-            raise RuntimeError(msg)
-        try:
-            release_data = response.json()
-        except ValueError as je:
-            raise RuntimeError(f"Failed to parse release JSON: {je}\nRaw (truncated 400): {response.text[:400]}")
-    except Exception as e:
-        console.print(f"[red]Error fetching release information[/red]")
-        console.print(Panel(str(e), title="Fetch Error", border_style="red"))
-        raise typer.Exit(1)
-    
-    # Find the template asset for the specified AI assistant (with fallbacks)
-    asset_alias_map = {
-        "roo": "claude",  # Roo reuses Claude template assets until dedicated packages are published
+
+    default_repo = ("github", "spec-kit")
+    repo_preference_map = {
+        "roo": [
+            ("Michaelzag", "spec-kit-roo"),  # Check fork releases first for Roo-specific bundles
+        ],
     }
 
-    lookup_ai = ai_assistant
-    pattern = f"spec-kit-template-{lookup_ai}-{script_type}"
-    matching_assets = [
-        asset for asset in release_data.get("assets", [])
-        if pattern in asset["name"] and asset["name"].endswith(".zip")
-    ]
+    # Preserve order while removing duplicates
+    repo_candidates = repo_preference_map.get(ai_assistant, []) + [default_repo]
+    seen = set()
+    search_repos: list[Tuple[str, str]] = []
+    for owner, name in repo_candidates:
+        key = (owner, name)
+        if key not in seen:
+            seen.add(key)
+            search_repos.append(key)
 
-    fallback_used = False
-    if not matching_assets and ai_assistant in asset_alias_map:
-        fallback_ai = asset_alias_map[ai_assistant]
-        fallback_pattern = f"spec-kit-template-{fallback_ai}-{script_type}"
+    asset_alias_map = {
+        "roo": "claude",  # Reuse Claude assets when a dedicated Roo bundle is unavailable
+    }
+
+    chosen_asset = None
+    chosen_release = None
+    chosen_repo: Optional[Tuple[str, str]] = None
+    chosen_lookup_ai = ai_assistant
+    alias_fallback_used = False
+    last_assets = []
+    fetch_errors = []
+
+    if verbose:
+        repo_label = f"{search_repos[0][0]}/{search_repos[0][1]}"
+        console.print(f"[cyan]Fetching latest release information from {repo_label}...[/cyan]")
+
+    for index, (owner, name) in enumerate(search_repos):
+        repo_label = f"{owner}/{name}"
+        api_url = f"https://api.github.com/repos/{owner}/{name}/releases/latest"
+
+        if verbose and index > 0:
+            console.print(f"[cyan]Checking release assets in {repo_label}...[/cyan]")
+
+        try:
+            response = client.get(api_url, timeout=30, follow_redirects=True)
+            status = response.status_code
+            if status != 200:
+                msg = f"GitHub API returned {status} for {api_url}"
+                if debug:
+                    msg += f"\nResponse headers: {response.headers}\nBody (truncated 500): {response.text[:500]}"
+                raise RuntimeError(msg)
+            try:
+                current_release = response.json()
+            except ValueError as je:
+                raise RuntimeError(f"Failed to parse release JSON: {je}\nRaw (truncated 400): {response.text[:400]}")
+        except Exception as e:
+            fetch_errors.append(f"{repo_label}: {e}")
+            continue
+
+        last_assets = current_release.get("assets", [])
+        lookup_ai = ai_assistant
+        pattern = f"spec-kit-template-{lookup_ai}-{script_type}"
         matching_assets = [
-            asset for asset in release_data.get("assets", [])
-            if fallback_pattern in asset["name"] and asset["name"].endswith(".zip")
+            asset for asset in last_assets
+            if pattern in asset["name"] and asset["name"].endswith(".zip")
         ]
-        if matching_assets:
-            fallback_used = True
-            lookup_ai = fallback_ai
-            pattern = fallback_pattern
-            console.print(
-                Panel(
-                    f"No dedicated release asset found for '{ai_assistant}'. Using '{fallback_ai}' template instead.",
-                    title="Using Fallback Template",
-                    border_style="yellow",
+
+        alias_triggered = False
+        if not matching_assets and ai_assistant in asset_alias_map:
+            fallback_ai = asset_alias_map[ai_assistant]
+            fallback_pattern = f"spec-kit-template-{fallback_ai}-{script_type}"
+            matching_assets = [
+                asset for asset in last_assets
+                if fallback_pattern in asset["name"] and asset["name"].endswith(".zip")
+            ]
+            if matching_assets:
+                alias_triggered = True
+                lookup_ai = fallback_ai
+                pattern = fallback_pattern
+                console.print(
+                    Panel(
+                        f"No dedicated release asset found for '{ai_assistant}' in {repo_label}. Using '{fallback_ai}' template instead.",
+                        title="Using Fallback Template",
+                        border_style="yellow",
+                    )
                 )
+
+        if matching_assets:
+            chosen_asset = matching_assets[0]
+            chosen_release = current_release
+            chosen_repo = (owner, name)
+            chosen_lookup_ai = lookup_ai
+            alias_fallback_used = alias_triggered
+            break
+
+        if debug:
+            fetch_errors.append(
+                f"{repo_label}: No assets matched pattern '{pattern}'. Available assets: {[a.get('name','?') for a in last_assets]}"
             )
 
-    if not matching_assets:
-        console.print(f"[red]No matching release asset found[/red] for pattern: [bold]{pattern}[/bold]")
-        asset_names = [a.get('name','?') for a in release_data.get('assets', [])]
-        console.print(Panel("\n".join(asset_names) or "(no assets)", title="Available Assets", border_style="yellow"))
+    if chosen_asset is None or chosen_release is None or chosen_repo is None:
+        checked_repos = ", ".join(f"{o}/{n}" for o, n in search_repos)
+        console.print(f"[red]No matching release asset found[/red] for assistant '{ai_assistant}' (looked in: {checked_repos})")
+        if last_assets:
+            asset_names = [a.get('name', '?') for a in last_assets]
+            console.print(Panel("\n".join(asset_names) or "(no assets)", title="Available Assets", border_style="yellow"))
+        if fetch_errors:
+            console.print(Panel("\n".join(fetch_errors), title="Fetch diagnostics", border_style="red"))
         raise typer.Exit(1)
-    
+
+    # Inform when we fall back to a different repository in the search list
+    first_repo = search_repos[0]
+    if chosen_repo != first_repo:
+        fallback_from = f"{first_repo[0]}/{first_repo[1]}"
+        fallback_to = f"{chosen_repo[0]}/{chosen_repo[1]}"
+        console.print(
+            Panel(
+                f"No '{ai_assistant}' template found in {fallback_from}. Using assets from {fallback_to} instead.",
+                title="Template source fallback",
+                border_style="yellow",
+            )
+        )
+
     # Use the first matching asset
-    asset = matching_assets[0]
+    asset = chosen_asset
+    release_data = chosen_release
     download_url = asset["browser_download_url"]
     filename = asset["name"]
     file_size = asset["size"]
@@ -541,8 +601,9 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
         "size": file_size,
         "release": release_data["tag_name"],
         "asset_url": download_url,
-        "effective_ai": lookup_ai,
-        "fallback_used": fallback_used,
+        "effective_ai": chosen_lookup_ai,
+        "fallback_used": alias_fallback_used,
+        "source_repo": f"{chosen_repo[0]}/{chosen_repo[1]}",
     }
     return zip_path, metadata
 
